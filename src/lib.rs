@@ -130,63 +130,63 @@ mod tests {
     /// root token needed for testing
     const TOKEN: &str = "test12345";
 
-    #[test]
-    fn it_can_create_a_client() {
-        let _ = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_create_a_client() {
+        let _ = Client::new(HOST, TOKEN).await.unwrap();
     }
 
-    #[test]
-    fn it_can_create_a_client_from_a_string_reference() {
-        let _ = Client::new(&HOST.to_string(), TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_create_a_client_from_a_string_reference() {
+        let _ = Client::new(&HOST.to_string(), TOKEN).await.unwrap();
     }
 
-    #[test]
-    fn it_can_create_a_client_from_a_string() {
-        let _ = Client::new(HOST.to_string(), TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_create_a_client_from_a_string() {
+        let _ = Client::new(HOST.to_string(), TOKEN).await.unwrap();
     }
 
-    #[test]
-    fn it_can_query_secrets() {
-        let client = Client::new(HOST, TOKEN).unwrap();
-        let res = client.set_secret("hello_query", "world");
+    #[tokio::test]
+    async fn it_can_query_secrets() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
+        let res = client.set_secret("hello_query", "world").await;
         assert!(res.is_ok());
-        let res = client.get_secret("hello_query").unwrap();
+        let res = client.get_secret("hello_query").await.unwrap();
         assert_eq!(res, "world");
     }
 
-    #[test]
-    fn it_can_store_json_secrets() {
-        let client = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_store_json_secrets() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
         let json = "{\"foo\": {\"bar\": [\"baz\"]}}";
-        let res = client.set_secret("json_secret", json);
+        let res = client.set_secret("json_secret", json).await;
         assert!(res.is_ok());
-        let res = client.get_secret("json_secret").unwrap();
+        let res = client.get_secret("json_secret").await.unwrap();
         assert_eq!(res, json)
     }
 
-    #[test]
-    fn it_can_list_secrets() {
-        let client = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_list_secrets() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
 
-        let _res = client.set_secret("hello/fred", "world").unwrap();
+        let _res = client.set_secret("hello/fred", "world").await.unwrap();
         // assert!(res.is_ok());
-        let res = client.set_secret("hello/bob", "world");
+        let res = client.set_secret("hello/bob", "world").await;
         assert!(res.is_ok());
 
-        let res = client.list_secrets("hello");
+        let res = client.list_secrets("hello").await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ["bob", "fred"]);
 
-        let res = client.list_secrets("hello/");
+        let res = client.list_secrets("hello/").await;
         assert!(res.is_ok());
         assert_eq!(res.unwrap(), ["bob", "fred"]);
     }
 
-    #[test]
-    fn it_can_detect_404_status() {
-        let client = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_detect_404_status() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
 
-        let res = client.list_secrets("non/existent/key");
+        let res = client.list_secrets("non/existent/key").await;
         assert!(res.is_err());
 
         if let Err(Error::VaultResponse(_, response)) = res {
@@ -196,42 +196,42 @@ mod tests {
         }
     }
 
-    #[test]
-    fn it_can_write_secrets_with_newline() {
-        let client = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_write_secrets_with_newline() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
 
-        let res = client.set_secret("hello_set", "world\n");
+        let res = client.set_secret("hello_set", "world\n").await;
         assert!(res.is_ok());
-        let res = client.get_secret("hello_set").unwrap();
+        let res = client.get_secret("hello_set").await.unwrap();
         assert_eq!(res, "world\n");
     }
 
-    #[test]
-    fn it_returns_err_on_forbidden() {
-        let client = Client::new(HOST, "test123456");
+    #[tokio::test]
+    async fn it_returns_err_on_forbidden() {
+        let client = Client::new(HOST, "test123456").await;
         // assert_eq!(Err("Forbidden".to_string()), client);
         assert!(client.is_err());
     }
 
-    #[test]
-    fn it_can_delete_a_secret() {
-        let client = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_delete_a_secret() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
 
-        let res = client.set_secret("hello_delete", "world");
+        let res = client.set_secret("hello_delete", "world").await;
         assert!(res.is_ok());
-        let res = client.get_secret("hello_delete").unwrap();
+        let res = client.get_secret("hello_delete").await.unwrap();
         assert_eq!(res, "world");
-        let res = client.delete_secret("hello_delete");
+        let res = client.delete_secret("hello_delete").await;
         assert!(res.is_ok());
-        let res = client.get_secret("hello_delete");
+        let res = client.get_secret("hello_delete").await;
         assert!(res.is_err());
     }
 
-    #[test]
-    fn it_can_perform_approle_workflow() {
+    #[tokio::test]
+    async fn it_can_perform_approle_workflow() {
         use std::collections::HashMap;
 
-        let c = Client::new(HOST, TOKEN).unwrap();
+        let c = Client::new(HOST, TOKEN).await.unwrap();
         let mut body = "{\"type\":\"approle\"}";
         // Ensure we do not currently have an approle backend enabled.
         // Older vault versions (<1.2.0) seem to have an AppRole backend
@@ -239,10 +239,12 @@ mod tests {
         // fails with a 400 status
         let _: EndpointResponse<()> = c
             .call_endpoint(DELETE, "sys/auth/approle", None, None)
+            .await
             .unwrap();
         // enable approle auth backend
         let mut res: EndpointResponse<()> = c
             .call_endpoint(POST, "sys/auth/approle", None, Some(body))
+            .await
             .unwrap();
         panic_non_empty(&res);
         // make a new approle
@@ -250,15 +252,17 @@ mod tests {
                 \"secret_id_num_uses\":40}";
         res = c
             .call_endpoint(POST, "auth/approle/role/test_role", None, Some(body))
+            .await
             .unwrap();
         panic_non_empty(&res);
 
         // let's test the properties endpoint while we're here
-        let _ = c.get_app_role_properties("test_role").unwrap();
+        let _ = c.get_app_role_properties("test_role").await.unwrap();
 
         // get approle's role-id
         let res: EndpointResponse<HashMap<String, String>> = c
             .call_endpoint(GET, "auth/approle/role/test_role/role-id", None, None)
+            .await
             .unwrap();
         let data = match res {
             EndpointResponse::VaultResponse(res) => res.data.unwrap(),
@@ -278,6 +282,7 @@ mod tests {
         // now get a secret id for this approle
         let res: EndpointResponse<SecretInfo> = c
             .call_endpoint(POST, "auth/approle/role/test_role/secret-id", None, None)
+            .await
             .unwrap();
         let data = match res {
             EndpointResponse::VaultResponse(res) => res.data.unwrap(),
@@ -286,45 +291,53 @@ mod tests {
         let secret_id = &data.secret_id;
 
         // now finally we can try to actually login!
-        let _ = Client::new_app_role(HOST, &role_id[..], Some(&secret_id[..])).unwrap();
+        let _ = Client::new_app_role(HOST, &role_id[..], Some(&secret_id[..]))
+            .await
+            .unwrap();
 
         // clean up by disabling approle auth backend
         let res = c
             .call_endpoint(DELETE, "sys/auth/approle", None, None)
+            .await
             .unwrap();
         panic_non_empty(&res);
     }
 
-    #[test]
-    fn it_can_read_a_wrapped_secret() {
-        let client = Client::new(HOST, TOKEN).unwrap();
-        let res = client.set_secret("hello_delete_2", "second world");
+    #[tokio::test]
+    async fn it_can_read_a_wrapped_secret() {
+        let client = Client::new(HOST, TOKEN).await.unwrap();
+        let res = client.set_secret("hello_delete_2", "second world").await;
         assert!(res.is_ok());
         // wrap the secret's value in `sys/wrapping/unwrap` with a TTL of 2 minutes
-        let res = client.get_secret_wrapped("hello_delete_2", "2m").unwrap();
+        let res = client
+            .get_secret_wrapped("hello_delete_2", "2m")
+            .await
+            .unwrap();
         let wrapping_token = res.wrap_info.unwrap().token;
         // make a new client with the wrapping token
         let c2 = Client::new_no_lookup(HOST, wrapping_token).unwrap();
         // read the cubbyhole response (can only do this once!)
-        let res = c2.get_unwrapped_response().unwrap();
+        let res = c2.get_unwrapped_response().await.unwrap();
         assert_eq!(res.data.unwrap()["value"], "second world");
     }
 
-    #[test]
-    fn it_can_store_policies() {
+    #[tokio::test]
+    async fn it_can_store_policies() {
         // use trailing slash for host to ensure Url processing fixes this later
-        let c = Client::new("http://127.0.0.1:8200/", TOKEN).unwrap();
+        let c = Client::new("http://127.0.0.1:8200/", TOKEN).await.unwrap();
         let body = "{\"policy\":\"{}\"}";
         // enable approle auth backend
         let res: EndpointResponse<()> = c
             .call_endpoint(PUT, "sys/policy/test_policy_1", None, Some(body))
+            .await
             .unwrap();
         panic_non_empty(&res);
         let res: EndpointResponse<()> = c
             .call_endpoint(PUT, "sys/policy/test_policy_2", None, Some(body))
+            .await
             .unwrap();
         panic_non_empty(&res);
-        let client_policies = c.policies().unwrap();
+        let client_policies = c.policies().await.unwrap();
         let expected_policies = ["default", "test_policy_1", "test_policy_2", "root"];
         let _ = expected_policies
             .iter()
@@ -338,10 +351,11 @@ mod tests {
             .default_policy(false)
             .id(&token_name[..])
             .ttl(client::VaultDuration::minutes(1));
-        let _ = c.create_token(&token_opts).unwrap();
+        let _ = c.create_token(&token_opts).await.unwrap();
         let body = format!("{{\"token\":\"{}\"}}", &token_name);
         let res: EndpointResponse<client::TokenData> = c
             .call_endpoint(POST, "auth/token/lookup", None, Some(&body))
+            .await
             .unwrap();
         match res {
             EndpointResponse::VaultResponse(res) => {
@@ -355,22 +369,26 @@ mod tests {
         // clean-up
         let res: EndpointResponse<()> = c
             .call_endpoint(DELETE, "sys/policy/test_policy_1", None, None)
+            .await
             .unwrap();
         panic_non_empty(&res);
         let res: EndpointResponse<()> = c
             .call_endpoint(DELETE, "sys/policy/test_policy_2", None, None)
+            .await
             .unwrap();
         panic_non_empty(&res);
     }
 
-    #[test]
-    fn it_can_list_things() {
-        let c = Client::new(HOST, TOKEN).unwrap();
+    #[tokio::test]
+    async fn it_can_list_things() {
+        let c = Client::new(HOST, TOKEN).await.unwrap();
         let _ = c
             .create_token(&client::TokenOptions::default().ttl(client::VaultDuration::minutes(1)))
+            .await
             .unwrap();
         let res: EndpointResponse<client::ListResponse> = c
             .call_endpoint(LIST, "auth/token/accessors", None, None)
+            .await
             .unwrap();
         match res {
             EndpointResponse::VaultResponse(res) => {
@@ -381,16 +399,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn it_can_encrypt_decrypt_transit() {
+    #[tokio::test]
+    async fn it_can_encrypt_decrypt_transit() {
         let key_id = "test-vault-rs";
         let plaintext = b"data\0to\0encrypt";
 
-        let client = Client::new(HOST, TOKEN).unwrap();
+        let client = Client::new(HOST, TOKEN).await.unwrap();
         let enc_resp = client.transit_encrypt(None, key_id, plaintext);
-        let encrypted = enc_resp.unwrap();
+        let encrypted = enc_resp.await.unwrap();
         let dec_resp = client.transit_decrypt(None, key_id, encrypted);
-        let payload = dec_resp.unwrap();
+        let payload = dec_resp.await.unwrap();
         assert_eq!(plaintext, payload.as_slice());
     }
 
@@ -407,17 +425,17 @@ mod tests {
         name: String,
     }
 
-    #[test]
-    fn it_can_set_and_get_a_custom_secret_type() {
+    #[tokio::test]
+    async fn it_can_set_and_get_a_custom_secret_type() {
         let input = CustomSecretType {
             name: "test".into(),
         };
 
-        let client = Client::new(HOST, TOKEN).unwrap();
+        let client = Client::new(HOST, TOKEN).await.unwrap();
 
-        let res = client.set_custom_secret("custom_type", &input);
+        let res = client.set_custom_secret("custom_type", &input).await;
         assert!(res.is_ok());
-        let res: CustomSecretType = client.get_custom_secret("custom_type").unwrap();
+        let res: CustomSecretType = client.get_custom_secret("custom_type").await.unwrap();
         assert_eq!(res, input);
     }
 }

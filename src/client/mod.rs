@@ -7,12 +7,7 @@ use std::str::FromStr;
 
 use crate::client::error::{Error, Result};
 use base64;
-use reqwest::{
-    self,
-    blocking::{Client, Response},
-    header::CONTENT_TYPE,
-    Method,
-};
+use reqwest::{self, header::CONTENT_TYPE, Client, Method, Response};
 use serde::de::{self, DeserializeOwned, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -657,7 +652,7 @@ pub enum EndpointResponse<D> {
 
 impl VaultClient<TokenData> {
     /// Construct a `VaultClient` from an existing vault token
-    pub fn new<U, T: Into<String>>(host: U, token: T) -> Result<VaultClient<TokenData>>
+    pub async fn new<U, T: Into<String>>(host: U, token: T) -> Result<VaultClient<TokenData>>
     where
         U: TryInto<Url, Err = Error>,
     {
@@ -668,7 +663,8 @@ impl VaultClient<TokenData> {
             client
                 .get(host.join("/v1/auth/token/lookup-self")?)
                 .header("X-Vault-Token", token.clone())
-                .send(),
+                .send()
+                .await,
         )?;
         let decoded: VaultResponse<TokenData> = parse_vault_response(res)?;
         Ok(VaultClient {
@@ -680,7 +676,7 @@ impl VaultClient<TokenData> {
         })
     }
     /// Construct a `VaultClient` from an existing vault token and reqwest::Client
-    pub fn new_from_reqwest<U, T: Into<String>>(
+    pub async fn new_from_reqwest<U, T: Into<String>>(
         host: U,
         token: T,
         cli: Client,
@@ -695,7 +691,8 @@ impl VaultClient<TokenData> {
             client
                 .get(host.join("/v1/auth/token/lookup-self")?)
                 .header("X-Vault-Token", token.clone())
-                .send(),
+                .send()
+                .await,
         )?;
         let decoded: VaultResponse<TokenData> = parse_vault_response(res)?;
         Ok(VaultClient {
@@ -714,7 +711,7 @@ impl VaultClient<()> {
     ///
     /// NOTE: This backend is now deprecated by vault.
     #[deprecated(since = "0.6.1")]
-    pub fn new_app_id<U, S1: Into<String>, S2: Into<String>>(
+    pub async fn new_app_id<U, S1: Into<String>, S2: Into<String>>(
         host: U,
         app_id: S1,
         user_id: S2,
@@ -732,7 +729,8 @@ impl VaultClient<()> {
             client
                 .post(host.join("/v1/auth/app-id/login")?)
                 .body(payload)
-                .send(),
+                .send()
+                .await,
         )?;
         let decoded: VaultResponse<()> = parse_vault_response(res)?;
         let token = match decoded.auth {
@@ -755,7 +753,7 @@ impl VaultClient<()> {
 
     /// Construct a `VaultClient` via the `AppRole`
     /// [auth backend](https://www.vaultproject.io/docs/auth/approle.html)
-    pub fn new_app_role<U, R, S>(
+    pub async fn new_app_role<U, R, S>(
         host: U,
         role_id: R,
         secret_id: Option<S>,
@@ -779,7 +777,8 @@ impl VaultClient<()> {
             client
                 .post(host.join("/v1/auth/approle/login")?)
                 .body(payload)
-                .send(),
+                .send()
+                .await,
         )?;
         let decoded: VaultResponse<()> = parse_vault_response(res)?;
         let token = match decoded.auth {
@@ -855,8 +854,10 @@ where
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
-    pub fn renew(&mut self) -> Result<()> {
-        let res = self.post::<_, String>("/v1/auth/token/renew-self", None, None)?;
+    pub async fn renew(&mut self) -> Result<()> {
+        let res = self
+            .post::<_, String>("/v1/auth/token/renew-self", None, None)
+            .await?;
         let vault_res: VaultResponse<T> = parse_vault_response(res)?;
         if let Some(ref mut data) = self.data {
             data.auth = vault_res.auth;
@@ -880,12 +881,18 @@ where
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
-    pub fn renew_token<S: Into<String>>(&self, token: S, increment: Option<u64>) -> Result<Auth> {
+    pub async fn renew_token<S: Into<String>>(
+        &self,
+        token: S,
+        increment: Option<u64>,
+    ) -> Result<Auth> {
         let body = serde_json::to_string(&RenewTokenOptions {
             token: token.into(),
             increment,
         })?;
-        let res = self.post::<_, String>("/v1/auth/token/renew", Some(&body), None)?;
+        let res = self
+            .post::<_, String>("/v1/auth/token/renew", Some(&body), None)
+            .await?;
         let vault_res: VaultResponse<()> = parse_vault_response(res)?;
         vault_res
             .auth
@@ -919,8 +926,10 @@ where
     /// client after revoking it.
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
-    pub fn revoke(self) -> Result<()> {
-        let _ = self.post::<_, String>("/v1/auth/token/revoke-self", None, None)?;
+    pub async fn revoke(self) -> Result<()> {
+        let _ = self
+            .post::<_, String>("/v1/auth/token/revoke-self", None, None)
+            .await?;
         Ok(())
     }
 
@@ -947,7 +956,7 @@ where
     /// ```
     ///
     /// [renew]: https://www.vaultproject.io/docs/http/sys-renew.html
-    pub fn renew_lease<S: Into<String>>(
+    pub async fn renew_lease<S: Into<String>>(
         &self,
         lease_id: S,
         increment: Option<u64>,
@@ -956,7 +965,9 @@ where
             lease_id: lease_id.into(),
             increment,
         })?;
-        let res = self.put::<_, String>("/v1/sys/leases/renew", Some(&body), None)?;
+        let res = self
+            .put::<_, String>("/v1/sys/leases/renew", Some(&body), None)
+            .await?;
         let vault_res: VaultResponse<()> = parse_vault_response(res)?;
         Ok(vault_res)
     }
@@ -977,8 +988,10 @@ where
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
-    pub fn lookup(&self) -> Result<VaultResponse<TokenData>> {
-        let res = self.get::<_, String>("/v1/auth/token/lookup-self", None)?;
+    pub async fn lookup(&self) -> Result<VaultResponse<TokenData>> {
+        let res = self
+            .get::<_, String>("/v1/auth/token/lookup-self", None)
+            .await?;
         let vault_res: VaultResponse<TokenData> = parse_vault_response(res)?;
         Ok(vault_res)
     }
@@ -1011,9 +1024,11 @@ where
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
-    pub fn create_token(&self, opts: &TokenOptions) -> Result<Auth> {
+    pub async fn create_token(&self, opts: &TokenOptions) -> Result<Auth> {
         let body = serde_json::to_string(opts)?;
-        let res = self.post::<_, String>("/v1/auth/token/create", Some(&body), None)?;
+        let res = self
+            .post::<_, String>("/v1/auth/token/create", Some(&body), None)
+            .await?;
         let vault_res: VaultResponse<()> = parse_vault_response(res)?;
         vault_res
             .auth
@@ -1033,11 +1048,15 @@ where
     /// let res = client.set_secret("hello_set", "world");
     /// assert!(res.is_ok());
     /// ```
-    pub fn set_secret<S1: Into<String>, S2: AsRef<str>>(&self, key: S1, value: S2) -> Result<()> {
+    pub async fn set_secret<S1: Into<String>, S2: AsRef<str>>(
+        &self,
+        key: S1,
+        value: S2,
+    ) -> Result<()> {
         let secret = DefaultSecretType {
             value: value.as_ref(),
         };
-        self.set_custom_secret(key, &secret)
+        self.set_custom_secret(key, &secret).await
     }
 
     /// Saves a secret
@@ -1062,18 +1081,20 @@ where
     /// let res = client.set_custom_secret("hello_set", &secret);
     /// assert!(res.is_ok());
     /// ```
-    pub fn set_custom_secret<S1, S2>(&self, secret_name: S1, secret: &S2) -> Result<()>
+    pub async fn set_custom_secret<S1, S2>(&self, secret_name: S1, secret: &S2) -> Result<()>
     where
         S1: Into<String>,
         S2: Serialize,
     {
         let secret = SecretContainer { data: secret };
         let json = serde_json::to_string(&secret)?;
-        let _ = self.put::<_, String>(
-            &format!("/v1/{}/data/{}", self.secret_backend, secret_name.into())[..],
-            Some(&json),
-            None,
-        )?;
+        let _ = self
+            .put::<_, String>(
+                &format!("/v1/{}/data/{}", self.secret_backend, secret_name.into())[..],
+                Some(&json),
+                None,
+            )
+            .await?;
         Ok(())
     }
 
@@ -1095,12 +1116,14 @@ where
     /// assert!(res.is_ok());
     /// assert_eq!(res.unwrap(), ["bob", "fred"]);
     /// ```
-    pub fn list_secrets<S: AsRef<str>>(&self, key: S) -> Result<Vec<String>> {
-        let res = self.list::<_, String>(
-            &format!("/v1/{}/metadata/{}", self.secret_backend, key.as_ref())[..],
-            None,
-            None,
-        )?;
+    pub async fn list_secrets<S: AsRef<str>>(&self, key: S) -> Result<Vec<String>> {
+        let res = self
+            .list::<_, String>(
+                &format!("/v1/{}/metadata/{}", self.secret_backend, key.as_ref())[..],
+                None,
+                None,
+            )
+            .await?;
         let decoded: VaultResponse<ListResponse> = parse_vault_response(res)?;
         match decoded.data {
             Some(data) => Ok(data.keys),
@@ -1127,8 +1150,8 @@ where
     /// assert!(res.is_ok());
     /// assert_eq!(res.unwrap(), "world");
     /// ```
-    pub fn get_secret<S: AsRef<str>>(&self, key: S) -> Result<String> {
-        let secret: DefaultSecretType<String> = self.get_custom_secret(key)?;
+    pub async fn get_secret<S: AsRef<str>>(&self, key: S) -> Result<String> {
+        let secret: DefaultSecretType<String> = self.get_custom_secret(key).await?;
         Ok(secret.value)
     }
 
@@ -1160,14 +1183,16 @@ where
     /// assert_eq!(thing.awesome, "I really am cool");
     /// assert_eq!(thing.thing, "this is also in the secret");
     /// ```
-    pub fn get_custom_secret<S: AsRef<str>, S2: DeserializeOwned + std::fmt::Debug>(
+    pub async fn get_custom_secret<S: AsRef<str>, S2: DeserializeOwned + std::fmt::Debug>(
         &self,
         secret_name: S,
     ) -> Result<S2> {
-        let res = self.get::<_, String>(
-            &format!("/v1/{}/data/{}", self.secret_backend, secret_name.as_ref())[..],
-            None,
-        )?;
+        let res = self
+            .get::<_, String>(
+                &format!("/v1/{}/data/{}", self.secret_backend, secret_name.as_ref())[..],
+                None,
+            )
+            .await?;
         let decoded: VaultResponse<SecretDataWrapper<S2>> = parse_vault_response(res)?;
         match decoded.data {
             Some(data) => Ok(data.data),
@@ -1180,15 +1205,17 @@ where
 
     /// Fetch a wrapped secret. Token (one-time use) to fetch secret will be in `wrap_info.token`
     /// https://www.vaultproject.io/docs/secrets/cubbyhole/index.html
-    pub fn get_secret_wrapped<S1: AsRef<str>, S2: AsRef<str>>(
+    pub async fn get_secret_wrapped<S1: AsRef<str>, S2: AsRef<str>>(
         &self,
         key: S1,
         wrap_ttl: S2,
     ) -> Result<VaultResponse<()>> {
-        let res = self.get(
-            &format!("/v1/{}/data/{}", self.secret_backend, key.as_ref())[..],
-            Some(wrap_ttl.as_ref()),
-        )?;
+        let res = self
+            .get(
+                &format!("/v1/{}/data/{}", self.secret_backend, key.as_ref())[..],
+                Some(wrap_ttl.as_ref()),
+            )
+            .await?;
         parse_vault_response(res)
     }
 
@@ -1197,22 +1224,26 @@ where
     ///
     /// The `data` attribute of `VaultResponse` should contain the unwrapped information, which is
     /// returned as a `HashMap<String, String>`.
-    pub fn get_unwrapped_response(&self) -> Result<VaultResponse<HashMap<String, String>>> {
-        let res = self.post::<_, String>("/v1/sys/wrapping/unwrap", None, None)?;
+    pub async fn get_unwrapped_response(&self) -> Result<VaultResponse<HashMap<String, String>>> {
+        let res = self
+            .post::<_, String>("/v1/sys/wrapping/unwrap", None, None)
+            .await?;
         let result: VaultResponse<SecretDataWrapper<HashMap<String, String>>> =
             parse_vault_response(res)?;
         Ok(result.into())
     }
 
     /// Reads the properties of an existing `AppRole`.
-    pub fn get_app_role_properties<S: AsRef<str>>(
+    pub async fn get_app_role_properties<S: AsRef<str>>(
         &self,
         role_name: S,
     ) -> Result<VaultResponse<AppRoleProperties>> {
-        let res = self.get::<_, String>(
-            &format!("/v1/auth/approle/role/{}", role_name.as_ref()),
-            None,
-        )?;
+        let res = self
+            .get::<_, String>(
+                &format!("/v1/auth/approle/role/{}", role_name.as_ref()),
+                None,
+            )
+            .await?;
         parse_vault_response(res)
     }
 
@@ -1229,7 +1260,7 @@ where
     /// let client = Client::new(host, token).unwrap();
     /// let res = client.transit_encrypt(None, "keyname", b"plaintext");
     /// ```
-    pub fn transit_encrypt<S1: Into<String>, S2: AsRef<[u8]>>(
+    pub async fn transit_encrypt<S1: Into<String>, S2: AsRef<[u8]>>(
         &self,
         mountpoint: Option<String>,
         key: S1,
@@ -1237,11 +1268,13 @@ where
     ) -> Result<Vec<u8>> {
         let path = mountpoint.unwrap_or_else(|| "transit".to_owned());
         let encoded_plaintext = base64::encode(plaintext.as_ref());
-        let res = self.post::<_, String>(
-            &format!("/v1/{}/encrypt/{}", path, key.into())[..],
-            Some(&format!("{{\"plaintext\": \"{}\"}}", encoded_plaintext)[..]),
-            None,
-        )?;
+        let res = self
+            .post::<_, String>(
+                &format!("/v1/{}/encrypt/{}", path, key.into())[..],
+                Some(&format!("{{\"plaintext\": \"{}\"}}", encoded_plaintext)[..]),
+                None,
+            )
+            .await?;
         let decoded: VaultResponse<TransitEncryptedData> = parse_vault_response(res)?;
         let payload = match decoded.data {
             Some(data) => data.ciphertext,
@@ -1276,7 +1309,7 @@ where
     /// let client = Client::new(host, token).unwrap();
     /// let res = client.transit_decrypt(None, "keyname", b"\x02af\x61bcb\x55d");
     /// ```
-    pub fn transit_decrypt<S1: Into<String>, S2: AsRef<[u8]>>(
+    pub async fn transit_decrypt<S1: Into<String>, S2: AsRef<[u8]>>(
         &self,
         mountpoint: Option<String>,
         key: S1,
@@ -1284,11 +1317,13 @@ where
     ) -> Result<Vec<u8>> {
         let path = mountpoint.unwrap_or_else(|| "transit".to_owned());
         let encoded_ciphertext = "vault:v1:".to_owned() + &base64::encode(ciphertext.as_ref());
-        let res = self.post::<_, String>(
-            &format!("/v1/{}/decrypt/{}", path, key.into())[..],
-            Some(&format!("{{\"ciphertext\": \"{}\"}}", encoded_ciphertext)[..]),
-            None,
-        )?;
+        let res = self
+            .post::<_, String>(
+                &format!("/v1/{}/decrypt/{}", path, key.into())[..],
+                Some(&format!("{{\"ciphertext\": \"{}\"}}", encoded_ciphertext)[..]),
+                None,
+            )
+            .await?;
         let decoded: VaultResponse<TransitDecryptedData> = parse_vault_response(res)?;
         let decrypted = match decoded.data {
             Some(data) => data.plaintext,
@@ -1310,7 +1345,7 @@ where
     /// with any wrapping or associated body text and the request will be sent.
     ///
     /// See `it_can_perform_approle_workflow` test case for examples.
-    pub fn call_endpoint<D: DeserializeOwned>(
+    pub async fn call_endpoint<D: DeserializeOwned>(
         &self,
         http_verb: HttpVerb,
         endpoint: &str,
@@ -1320,23 +1355,23 @@ where
         let url = format!("/v1/{}", endpoint);
         match http_verb {
             HttpVerb::GET => {
-                let res = self.get(&url, wrap_ttl)?;
+                let res = self.get(&url, wrap_ttl).await?;
                 parse_endpoint_response(res)
             }
             HttpVerb::POST => {
-                let res = self.post(&url, body, wrap_ttl)?;
+                let res = self.post(&url, body, wrap_ttl).await?;
                 parse_endpoint_response(res)
             }
             HttpVerb::PUT => {
-                let res = self.put(&url, body, wrap_ttl)?;
+                let res = self.put(&url, body, wrap_ttl).await?;
                 parse_endpoint_response(res)
             }
             HttpVerb::DELETE => {
-                let res = self.delete(&url)?;
+                let res = self.delete(&url).await?;
                 parse_endpoint_response(res)
             }
             HttpVerb::LIST => {
-                let res = self.list(&url, body, wrap_ttl)?;
+                let res = self.list(&url, body, wrap_ttl).await?;
                 parse_endpoint_response(res)
             }
         }
@@ -1344,14 +1379,16 @@ where
 
     /// Accesses a given endpoint using the provided `wrap_ttl` and returns a single-use
     /// `wrapping_token` to access the response provided by the endpoint.
-    pub fn get_wrapping_token_for_endpoint(
+    pub async fn get_wrapping_token_for_endpoint(
         &self,
         http_verb: HttpVerb,
         endpoint: &str,
         wrap_ttl: &str,
         body: Option<&str>,
     ) -> Result<String> {
-        let res = self.call_endpoint::<()>(http_verb, endpoint.as_ref(), Some(wrap_ttl), body)?;
+        let res = self
+            .call_endpoint::<()>(http_verb, endpoint.as_ref(), Some(wrap_ttl), body)
+            .await?;
         match res {
             EndpointResponse::VaultResponse(res) => match res.wrap_info {
                 Some(wrap_info) => Ok(wrap_info.token),
@@ -1379,15 +1416,20 @@ where
     /// let res = client.delete_secret("hello_delete");
     /// assert!(res.is_ok());
     /// ```
-    pub fn delete_secret(&self, key: &str) -> Result<()> {
-        let _ = self.delete(&format!("/v1/{}/data/{}", self.secret_backend, key)[..])?;
+    pub async fn delete_secret(&self, key: &str) -> Result<()> {
+        let _ = self
+            .delete(&format!("/v1/{}/data/{}", self.secret_backend, key)[..])
+            .await?;
         Ok(())
     }
 
     /// Get postgresql secret backend
     /// https://www.vaultproject.io/docs/secrets/postgresql/index.html
-    pub fn get_postgresql_backend(&self, name: &str) -> Result<VaultResponse<PostgresqlLogin>> {
-        self.get_secret_engine_creds("postgresql", name)
+    pub async fn get_postgresql_backend(
+        &self,
+        name: &str,
+    ) -> Result<VaultResponse<PostgresqlLogin>> {
+        self.get_secret_engine_creds("postgresql", name).await
     }
 
     /// Get creds from an arbitrary backend
@@ -1408,11 +1450,17 @@ where
     /// let res = client.get_secret_engine_creds::<PacketKey>("packet", "1h-read-only-user").unwrap();
     /// let api_token = res.data.unwrap().api_key_token;
     /// ```
-    pub fn get_secret_engine_creds<K>(&self, backend: &str, name: &str) -> Result<VaultResponse<K>>
+    pub async fn get_secret_engine_creds<K>(
+        &self,
+        backend: &str,
+        name: &str,
+    ) -> Result<VaultResponse<K>>
     where
         K: DeserializeOwned,
     {
-        let res = self.get::<_, String>(&format!("/v1/{}/creds/{}", backend, name)[..], None)?;
+        let res = self
+            .get::<_, String>(&format!("/v1/{}/creds/{}", backend, name)[..], None)
+            .await?;
         let decoded: VaultResponse<K> = parse_vault_response(res)?;
         Ok(decoded)
     }
@@ -1433,13 +1481,13 @@ where
     /// ```
     ///
     /// [/sys/policy]: https://www.vaultproject.io/docs/http/sys-policy.html
-    pub fn policies(&self) -> Result<Vec<String>> {
-        let res = self.get::<_, String>("/v1/sys/policy", None)?;
+    pub async fn policies(&self) -> Result<Vec<String>> {
+        let res = self.get::<_, String>("/v1/sys/policy", None).await?;
         let decoded: PoliciesResponse = parse_vault_response(res)?;
         Ok(decoded.policies)
     }
 
-    fn get<S1: AsRef<str>, S2: Into<String>>(
+    async fn get<S1: AsRef<str>, S2: Into<String>>(
         &self,
         endpoint: S1,
         wrap_ttl: Option<S2>,
@@ -1452,29 +1500,32 @@ where
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-                    .send(),
+                    .send()
+                    .await,
             )?),
             None => Ok(handle_reqwest_response(
                 self.client
                     .request(Method::GET, h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
-                    .send(),
+                    .send()
+                    .await,
             )?),
         }
     }
 
-    fn delete<S: AsRef<str>>(&self, endpoint: S) -> Result<Response> {
+    async fn delete<S: AsRef<str>>(&self, endpoint: S) -> Result<Response> {
         Ok(handle_reqwest_response(
             self.client
                 .request(Method::DELETE, self.host.join(endpoint.as_ref())?)
                 .header("X-Vault-Token", self.token.to_string())
                 .header(CONTENT_TYPE, "application/json")
-                .send(),
+                .send()
+                .await,
         )?)
     }
 
-    fn post<S1: AsRef<str>, S2: Into<String>>(
+    async fn post<S1: AsRef<str>, S2: Into<String>>(
         &self,
         endpoint: S1,
         body: Option<&str>,
@@ -1494,7 +1545,8 @@ where
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .body(body)
-                    .send(),
+                    .send()
+                    .await,
             )?),
             None => Ok(handle_reqwest_response(
                 self.client
@@ -1502,12 +1554,13 @@ where
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send(),
+                    .send()
+                    .await,
             )?),
         }
     }
 
-    fn put<S1: AsRef<str>, S2: Into<String>>(
+    async fn put<S1: AsRef<str>, S2: Into<String>>(
         &self,
         endpoint: S1,
         body: Option<&str>,
@@ -1527,7 +1580,8 @@ where
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .body(body)
-                    .send(),
+                    .send()
+                    .await,
             )?),
             None => Ok(handle_reqwest_response(
                 self.client
@@ -1535,12 +1589,13 @@ where
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send(),
+                    .send()
+                    .await,
             )?),
         }
     }
 
-    fn list<S1: AsRef<str>, S2: Into<String>>(
+    async fn list<S1: AsRef<str>, S2: Into<String>>(
         &self,
         endpoint: S1,
         body: Option<&str>,
@@ -1563,7 +1618,8 @@ where
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .body(body)
-                    .send(),
+                    .send()
+                    .await,
             )?),
             None => Ok(handle_reqwest_response(
                 self.client
@@ -1574,7 +1630,8 @@ where
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send(),
+                    .send()
+                    .await,
             )?),
         }
     }
@@ -1659,14 +1716,14 @@ fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<R
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
 ///                 .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-///                 .send(),
+///                 .send().await,
 ///         )?),
 ///         None => Ok(handle_reqwest_response(
 ///             client
 ///                 .request(Method::GET, h)
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
-///                 .send(),
+///                 .send().await,
 ///         )?),
 ///     }
 /// }
