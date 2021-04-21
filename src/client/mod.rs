@@ -1320,24 +1320,24 @@ where
         let url = format!("/v1/{}", endpoint);
         match http_verb {
             HttpVerb::GET => {
-                let mut res = self.get(&url, wrap_ttl)?;
-                parse_endpoint_response(&mut res)
+                let res = self.get(&url, wrap_ttl)?;
+                parse_endpoint_response(res)
             }
             HttpVerb::POST => {
-                let mut res = self.post(&url, body, wrap_ttl)?;
-                parse_endpoint_response(&mut res)
+                let res = self.post(&url, body, wrap_ttl)?;
+                parse_endpoint_response(res)
             }
             HttpVerb::PUT => {
-                let mut res = self.put(&url, body, wrap_ttl)?;
-                parse_endpoint_response(&mut res)
+                let res = self.put(&url, body, wrap_ttl)?;
+                parse_endpoint_response(res)
             }
             HttpVerb::DELETE => {
-                let mut res = self.delete(&url)?;
-                parse_endpoint_response(&mut res)
+                let res = self.delete(&url)?;
+                parse_endpoint_response(res)
             }
             HttpVerb::LIST => {
-                let mut res = self.list(&url, body, wrap_ttl)?;
-                parse_endpoint_response(&mut res)
+                let res = self.list(&url, body, wrap_ttl)?;
+                parse_endpoint_response(res)
             }
         }
     }
@@ -1706,12 +1706,11 @@ where
 }
 
 /// checks if response is empty before attempting to convert to a `VaultResponse`
-fn parse_endpoint_response<T>(res: &mut Response) -> Result<EndpointResponse<T>>
+fn parse_endpoint_response<T>(res: Response) -> Result<EndpointResponse<T>>
 where
     T: DeserializeOwned,
 {
-    let mut body = String::new();
-    let _ = res.read_to_string(&mut body)?;
+    let body = res.text()?;
     trace!("Response: {:?}", &body);
     if body.is_empty() {
         Ok(EndpointResponse::Empty)
