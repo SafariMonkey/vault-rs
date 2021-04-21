@@ -831,12 +831,14 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let mut client = Client::new(host, token).unwrap();
+    /// let mut client = Client::new(host, token).await.unwrap();
     /// client.secret_backend("my_secrets");
+    /// # })
     /// ```
     pub fn secret_backend<S1: Into<String>>(&mut self, backend_name: S1) {
         self.secret_backend = backend_name.into();
@@ -847,13 +849,15 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let mut client = Client::new(host, token).unwrap();
+    /// let mut client = Client::new(host, token).await.unwrap();
     ///
-    /// client.renew().unwrap();
+    /// client.renew().await.unwrap();
+    /// # })
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
@@ -873,14 +877,16 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
     /// let token_to_renew = "test12345";
-    /// client.renew_token(token_to_renew, None).unwrap();
+    /// client.renew_token(token_to_renew, None).await.unwrap();
+    /// # })
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
@@ -907,22 +913,24 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::{client, Client};
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
     /// // Create a temporary token, and use it to create a new client.
     /// let opts = client::TokenOptions::default()
     ///   .ttl(client::VaultDuration::minutes(5));
-    /// let res = client.create_token(&opts).unwrap();
-    /// let mut new_client = Client::new(host, res.client_token).unwrap();
+    /// let res = client.create_token(&opts).await.unwrap();
+    /// let mut new_client = Client::new(host, res.client_token).await.unwrap();
     ///
     /// // Issue and use a bunch of temporary dynamic credentials.
     ///
     /// // Revoke all our dynamic credentials with a single command.
-    /// new_client.revoke().unwrap();
+    /// new_client.revoke().await.unwrap();
+    /// # })
     /// ```
     ///
     /// Note that we consume our `self` parameter, so you cannot use the
@@ -941,21 +949,23 @@ where
     ///
     /// ```no_run
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     /// use serde::Deserialize;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
     /// #[derive(Deserialize)]
     /// struct PacketKey {
     ///   api_key_token: String,
     /// }
     ///
-    /// let res = client.get_secret_engine_creds::<PacketKey>("packet", "1h-read-only-user").unwrap();
+    /// let res = client.get_secret_engine_creds::<PacketKey>("packet", "1h-read-only-user").await.unwrap();
     ///
-    /// client.renew_lease(res.lease_id.unwrap(), None).unwrap();
+    /// client.renew_lease(res.lease_id.unwrap(), None).await.unwrap();
+    /// # })
     /// ```
     ///
     /// [renew]: https://www.vaultproject.io/docs/http/sys-renew.html
@@ -980,14 +990,16 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
-    /// let res = client.lookup().unwrap();
+    /// let res = client.lookup().await.unwrap();
     /// assert!(res.data.unwrap().policies.len() >= 0);
+    /// # })
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
@@ -1004,11 +1016,12 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::{client, Client};
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
     /// let opts = client::TokenOptions::default()
     ///   .display_name("test_token")
@@ -1020,10 +1033,11 @@ where
     ///   .number_of_uses(10)
     ///   .ttl(client::VaultDuration::minutes(1))
     ///   .explicit_max_ttl(client::VaultDuration::minutes(3));
-    /// let res = client.create_token(&opts).unwrap();
+    /// let res = client.create_token(&opts).await.unwrap();
     ///
-    /// # let new_client = Client::new(host, res.client_token).unwrap();
-    /// # new_client.revoke().unwrap();
+    /// # let new_client = Client::new(host, res.client_token).await.unwrap();
+    /// # new_client.revoke().await.unwrap();
+    /// # })
     /// ```
     ///
     /// [token]: https://www.vaultproject.io/docs/auth/token.html
@@ -1043,13 +1057,15 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
-    /// let res = client.set_secret("hello_set", "world");
+    /// let client = Client::new(host, token).await.unwrap();
+    /// let res = client.set_secret("hello_set", "world").await;
     /// assert!(res.is_ok());
+    /// # })
     /// ```
     pub async fn set_secret<S1: Into<String>, S2: AsRef<str>>(
         &self,
@@ -1066,6 +1082,7 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     /// use serde::{Deserialize, Serialize};
     ///
@@ -1076,13 +1093,14 @@ where
     /// }
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     /// let secret = MyThing {
     ///   awesome: "I really am cool".into(),
     ///   thing: "this is also in the secret".into(),
     /// };
-    /// let res = client.set_custom_secret("hello_set", &secret);
+    /// let res = client.set_custom_secret("hello_set", &secret).await;
     /// assert!(res.is_ok());
+    /// # })
     /// ```
     pub async fn set_custom_secret<S1, S2>(&self, secret_name: S1, secret: &S2) -> Result<()>
     where
@@ -1106,18 +1124,20 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
-    /// let res = client.set_secret("hello/fred", "world");
+    /// let client = Client::new(host, token).await.unwrap();
+    /// let res = client.set_secret("hello/fred", "world").await;
     /// assert!(res.is_ok());
-    /// let res = client.set_secret("hello/bob", "world");
+    /// let res = client.set_secret("hello/bob", "world").await;
     /// assert!(res.is_ok());
-    /// let res = client.list_secrets("hello/");
+    /// let res = client.list_secrets("hello/").await;
     /// assert!(res.is_ok());
     /// assert_eq!(res.unwrap(), ["bob", "fred"]);
+    /// # })
     /// ```
     pub async fn list_secrets<S: AsRef<str>>(&self, key: S) -> Result<Vec<String>> {
         let res = self
@@ -1142,16 +1162,18 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
-    /// let res = client.set_secret("hello_get", "world");
+    /// let client = Client::new(host, token).await.unwrap();
+    /// let res = client.set_secret("hello_get", "world").await;
     /// assert!(res.is_ok());
-    /// let res = client.get_secret("hello_get");
+    /// let res = client.get_secret("hello_get").await;
     /// assert!(res.is_ok());
     /// assert_eq!(res.unwrap(), "world");
+    /// # })
     /// ```
     pub async fn get_secret<S: AsRef<str>>(&self, key: S) -> Result<String> {
         let secret: DefaultSecretType<String> = self.get_custom_secret(key).await?;
@@ -1163,6 +1185,7 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     /// use serde::{Deserialize, Serialize};
     ///
@@ -1173,18 +1196,19 @@ where
     /// }
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     /// let secret = MyThing {
     ///   awesome: "I really am cool".into(),
     ///   thing: "this is also in the secret".into(),
     /// };
-    /// let res1 = client.set_custom_secret("custom_secret", &secret);
+    /// let res1 = client.set_custom_secret("custom_secret", &secret).await;
     /// assert!(res1.is_ok());
-    /// let res2: Result<MyThing, _> = client.get_custom_secret("custom_secret");
+    /// let res2: Result<MyThing, _> = client.get_custom_secret("custom_secret").await;
     /// assert!(res2.is_ok());
     /// let thing = res2.unwrap();
     /// assert_eq!(thing.awesome, "I really am cool");
     /// assert_eq!(thing.thing, "this is also in the secret");
+    /// # })
     /// ```
     pub async fn get_custom_secret<S: AsRef<str>, S2: DeserializeOwned + std::fmt::Debug>(
         &self,
@@ -1256,12 +1280,14 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
-    /// let res = client.transit_encrypt(None, "keyname", b"plaintext");
+    /// let client = Client::new(host, token).await.unwrap();
+    /// let res = client.transit_encrypt(None, "keyname", b"plaintext").await;
+    /// # })
     /// ```
     pub async fn transit_encrypt<S1: Into<String>, S2: AsRef<[u8]>>(
         &self,
@@ -1305,12 +1331,14 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
-    /// let res = client.transit_decrypt(None, "keyname", b"\x02af\x61bcb\x55d");
+    /// let client = Client::new(host, token).await.unwrap();
+    /// let res = client.transit_decrypt(None, "keyname", b"\x02af\x61bcb\x55d").await;
+    /// # })
     /// ```
     pub async fn transit_decrypt<S1: Into<String>, S2: AsRef<[u8]>>(
         &self,
@@ -1409,15 +1437,17 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
-    /// let res = client.set_secret("hello_delete", "world");
+    /// let client = Client::new(host, token).await.unwrap();
+    /// let res = client.set_secret("hello_delete", "world").await;
     /// assert!(res.is_ok());
-    /// let res = client.delete_secret("hello_delete");
+    /// let res = client.delete_secret("hello_delete").await;
     /// assert!(res.is_ok());
+    /// # })
     /// ```
     pub async fn delete_secret(&self, key: &str) -> Result<()> {
         let _ = self
@@ -1438,20 +1468,22 @@ where
     /// Get creds from an arbitrary backend
     /// ```no_run
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     /// use serde::Deserialize;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
     /// #[derive(Deserialize)]
     /// struct PacketKey {
     ///   api_key_token: String,
     /// }
     ///
-    /// let res = client.get_secret_engine_creds::<PacketKey>("packet", "1h-read-only-user").unwrap();
+    /// let res = client.get_secret_engine_creds::<PacketKey>("packet", "1h-read-only-user").await.unwrap();
     /// let api_token = res.data.unwrap().api_key_token;
+    /// # })
     /// ```
     pub async fn get_secret_engine_creds<K>(
         &self,
@@ -1473,14 +1505,16 @@ where
     ///
     /// ```
     /// # extern crate hashicorp_vault as vault;
+    /// # tokio_test::block_on(async {
     /// # use vault::Client;
     ///
     /// let host = "http://127.0.0.1:8200";
     /// let token = "test12345";
-    /// let client = Client::new(host, token).unwrap();
+    /// let client = Client::new(host, token).await.unwrap();
     ///
-    /// let res = client.policies().unwrap();
+    /// let res = client.policies().await.unwrap();
     /// assert!(res.contains(&"root".to_owned()));
+    /// # })
     /// ```
     ///
     /// [/sys/policy]: https://www.vaultproject.io/docs/http/sys-policy.html
@@ -1669,12 +1703,14 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
 ///
 /// ```
 /// # extern crate hashicorp_vault as vault;
+/// # tokio_test::block_on(async {
 /// # use vault::Client;
 /// use std::io::Read;
 /// use vault::{Error, Result, client::{VaultResponse, SecretDataWrapper}, TryInto};
 /// use std::result::Result as StdResult;
 /// use reqwest::{
-///    blocking::{Client as ReqwestClient, Response},
+///    Client as ReqwestClient,
+///    Response,
 ///    header::CONTENT_TYPE,
 ///    Method,
 ///  };
@@ -1687,26 +1723,20 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
 ///   thing: String,
 /// }
 ///
-/// fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
-///     let mut res = res?;
+/// // TODO: read error message again
+/// async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
+///     let res = res?;
 ///     if res.status().is_success() {
 ///         Ok(res)
 ///     } else {
-///         let mut error_msg = String::new();
-///         let _ = res.read_to_string(&mut error_msg).unwrap_or({
-///             error_msg.push_str("Could not read vault response.");
-///             0
-///         });
+///         let res_debug = format!("{:?}", &res);
 ///         Err(Error::VaultResponse(
-///             format!(
-///                 "Vault request failed: {:?}, error message: `{}`",
-///                 res, error_msg
-///             ),
+///             format!("Vault request failed: {:?}", res_debug),
 ///             res,
 ///         ))
 ///     }
 /// }
-/// fn get<S1: AsRef<str>, S2: Into<String>, U: TryInto<Url, Err = Error>>(
+/// async fn get<S1: AsRef<str>, S2: Into<String>, U: TryInto<Url, Err = Error>>(
 ///     host: U,
 ///     token: &str,
 ///     endpoint: S1,
@@ -1723,32 +1753,32 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
 ///                 .header(CONTENT_TYPE, "application/json")
 ///                 .header("X-Vault-Wrap-TTL", wrap_ttl.into())
 ///                 .send().await,
-///         )?),
+///         ).await?),
 ///         None => Ok(handle_reqwest_response(
 ///             client
 ///                 .request(Method::GET, h)
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
 ///                 .send().await,
-///         )?),
+///         ).await?),
 ///     }
 /// }
 /// let host = "http://127.0.0.1:8200";
 /// let token = "test12345";
-/// let client = Client::new(host, token).unwrap();
+/// let client = Client::new(host, token).await.unwrap();
 /// let secret = MyThing {
 ///   awesome: "I really am cool".into(),
 ///   thing: "this is also in the secret".into(),
 /// };
-/// let res1 = client.set_custom_secret("custom_secret", &secret);
+/// let res1 = client.set_custom_secret("custom_secret", &secret).await;
 /// assert!(res1.is_ok());
 /// let res = get::<&str, &str, &str>(
 ///     host,
 ///     token,
 ///     "/v1/secret/data/custom_secret",
 ///     None,
-/// ).unwrap();
-/// let decoded: VaultResponse<SecretDataWrapper<MyThing>> = vault::client::parse_vault_response(res).unwrap();
+/// ).await.unwrap();
+/// let decoded: VaultResponse<SecretDataWrapper<MyThing>> = vault::client::parse_vault_response(res).await.unwrap();
 /// let res2 = match decoded.data {
 ///     Some(data) => Ok(data.data),
 ///     _ => Err(Error::Vault(format!(
@@ -1760,6 +1790,8 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
 /// let thing = res2.unwrap();
 /// assert_eq!(thing.awesome, "I really am cool");
 /// assert_eq!(thing.thing, "this is also in the secret");
+/// # })
+/// ```
 pub async fn parse_vault_response<T>(res: Response) -> Result<T>
 where
     T: DeserializeOwned,
