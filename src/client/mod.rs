@@ -1690,9 +1690,8 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
     if res.status().is_success() {
         Ok(res)
     } else {
-        let res_debug = format!("{:?}", &res);
         Err(Error::VaultResponse(
-            format!("Vault request failed: {:?}", res_debug),
+            format!("Vault request failed: {:?}", res),
             res,
         ))
     }
@@ -1729,9 +1728,8 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
 ///     if res.status().is_success() {
 ///         Ok(res)
 ///     } else {
-///         let res_debug = format!("{:?}", &res);
 ///         Err(Error::VaultResponse(
-///             format!("Vault request failed: {:?}", res_debug),
+///             format!("Vault request failed: {:?}", res),
 ///             res,
 ///         ))
 ///     }
