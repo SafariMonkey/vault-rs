@@ -130,22 +130,22 @@ mod tests {
     /// root token needed for testing
     const TOKEN: &str = "test12345";
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_create_a_client() {
         let _ = Client::new(HOST, TOKEN).await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_create_a_client_from_a_string_reference() {
         let _ = Client::new(&HOST.to_string(), TOKEN).await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_create_a_client_from_a_string() {
         let _ = Client::new(HOST.to_string(), TOKEN).await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_query_secrets() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
         let res = client.set_secret("hello_query", "world").await;
@@ -154,7 +154,7 @@ mod tests {
         assert_eq!(res, "world");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_store_json_secrets() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
         let json = "{\"foo\": {\"bar\": [\"baz\"]}}";
@@ -164,7 +164,7 @@ mod tests {
         assert_eq!(res, json)
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_list_secrets() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
 
@@ -182,7 +182,7 @@ mod tests {
         assert_eq!(res.unwrap(), ["bob", "fred"]);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_detect_404_status() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
 
@@ -196,7 +196,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_write_secrets_with_newline() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
 
@@ -206,14 +206,14 @@ mod tests {
         assert_eq!(res, "world\n");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_returns_err_on_forbidden() {
         let client = Client::new(HOST, "test123456").await;
         // assert_eq!(Err("Forbidden".to_string()), client);
         assert!(client.is_err());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_delete_a_secret() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
 
@@ -227,7 +227,7 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_perform_approle_workflow() {
         use std::collections::HashMap;
 
@@ -303,7 +303,7 @@ mod tests {
         panic_non_empty(&res);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_read_a_wrapped_secret() {
         let client = Client::new(HOST, TOKEN).await.unwrap();
         let res = client.set_secret("hello_delete_2", "second world").await;
@@ -321,7 +321,7 @@ mod tests {
         assert_eq!(res.data.unwrap()["value"], "second world");
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_store_policies() {
         // use trailing slash for host to ensure Url processing fixes this later
         let c = Client::new("http://127.0.0.1:8200/", TOKEN).await.unwrap();
@@ -379,7 +379,7 @@ mod tests {
         panic_non_empty(&res);
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_list_things() {
         let c = Client::new(HOST, TOKEN).await.unwrap();
         let _ = c
@@ -399,7 +399,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_encrypt_decrypt_transit() {
         let key_id = "test-vault-rs";
         let plaintext = b"data\0to\0encrypt";
@@ -425,7 +425,7 @@ mod tests {
         name: String,
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     async fn it_can_set_and_get_a_custom_secret_type() {
         let input = CustomSecretType {
             name: "test".into(),

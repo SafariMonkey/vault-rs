@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::io::Read;
 use std::num::NonZeroU64;
 use std::result::Result as StdResult;
 use std::str::FromStr;
@@ -665,8 +664,9 @@ impl VaultClient<TokenData> {
                 .header("X-Vault-Token", token.clone())
                 .send()
                 .await,
-        )?;
-        let decoded: VaultResponse<TokenData> = parse_vault_response(res)?;
+        )
+        .await?;
+        let decoded: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(VaultClient {
             host,
             token,
@@ -693,8 +693,9 @@ impl VaultClient<TokenData> {
                 .header("X-Vault-Token", token.clone())
                 .send()
                 .await,
-        )?;
-        let decoded: VaultResponse<TokenData> = parse_vault_response(res)?;
+        )
+        .await?;
+        let decoded: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(VaultClient {
             host,
             token,
@@ -731,8 +732,9 @@ impl VaultClient<()> {
                 .body(payload)
                 .send()
                 .await,
-        )?;
-        let decoded: VaultResponse<()> = parse_vault_response(res)?;
+        )
+        .await?;
+        let decoded: VaultResponse<()> = parse_vault_response(res).await?;
         let token = match decoded.auth {
             Some(ref auth) => auth.client_token.clone(),
             None => {
@@ -779,8 +781,9 @@ impl VaultClient<()> {
                 .body(payload)
                 .send()
                 .await,
-        )?;
-        let decoded: VaultResponse<()> = parse_vault_response(res)?;
+        )
+        .await?;
+        let decoded: VaultResponse<()> = parse_vault_response(res).await?;
         let token = match decoded.auth {
             Some(ref auth) => auth.client_token.clone(),
             None => {
@@ -858,7 +861,7 @@ where
         let res = self
             .post::<_, String>("/v1/auth/token/renew-self", None, None)
             .await?;
-        let vault_res: VaultResponse<T> = parse_vault_response(res)?;
+        let vault_res: VaultResponse<T> = parse_vault_response(res).await?;
         if let Some(ref mut data) = self.data {
             data.auth = vault_res.auth;
         }
@@ -893,7 +896,7 @@ where
         let res = self
             .post::<_, String>("/v1/auth/token/renew", Some(&body), None)
             .await?;
-        let vault_res: VaultResponse<()> = parse_vault_response(res)?;
+        let vault_res: VaultResponse<()> = parse_vault_response(res).await?;
         vault_res
             .auth
             .ok_or_else(|| Error::Vault("No auth data returned while renewing token".to_owned()))
@@ -968,7 +971,7 @@ where
         let res = self
             .put::<_, String>("/v1/sys/leases/renew", Some(&body), None)
             .await?;
-        let vault_res: VaultResponse<()> = parse_vault_response(res)?;
+        let vault_res: VaultResponse<()> = parse_vault_response(res).await?;
         Ok(vault_res)
     }
 
@@ -992,7 +995,7 @@ where
         let res = self
             .get::<_, String>("/v1/auth/token/lookup-self", None)
             .await?;
-        let vault_res: VaultResponse<TokenData> = parse_vault_response(res)?;
+        let vault_res: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(vault_res)
     }
 
@@ -1029,7 +1032,7 @@ where
         let res = self
             .post::<_, String>("/v1/auth/token/create", Some(&body), None)
             .await?;
-        let vault_res: VaultResponse<()> = parse_vault_response(res)?;
+        let vault_res: VaultResponse<()> = parse_vault_response(res).await?;
         vault_res
             .auth
             .ok_or_else(|| Error::Vault("Created token did not include auth data".into()))
@@ -1124,7 +1127,7 @@ where
                 None,
             )
             .await?;
-        let decoded: VaultResponse<ListResponse> = parse_vault_response(res)?;
+        let decoded: VaultResponse<ListResponse> = parse_vault_response(res).await?;
         match decoded.data {
             Some(data) => Ok(data.keys),
             _ => Err(Error::Vault(format!(
@@ -1193,7 +1196,7 @@ where
                 None,
             )
             .await?;
-        let decoded: VaultResponse<SecretDataWrapper<S2>> = parse_vault_response(res)?;
+        let decoded: VaultResponse<SecretDataWrapper<S2>> = parse_vault_response(res).await?;
         match decoded.data {
             Some(data) => Ok(data.data),
             _ => Err(Error::Vault(format!(
@@ -1216,7 +1219,7 @@ where
                 Some(wrap_ttl.as_ref()),
             )
             .await?;
-        parse_vault_response(res)
+        parse_vault_response(res).await
     }
 
     /// Using a vault client created from a wrapping token, fetch the unwrapped `VaultResponse` from
@@ -1229,7 +1232,7 @@ where
             .post::<_, String>("/v1/sys/wrapping/unwrap", None, None)
             .await?;
         let result: VaultResponse<SecretDataWrapper<HashMap<String, String>>> =
-            parse_vault_response(res)?;
+            parse_vault_response(res).await?;
         Ok(result.into())
     }
 
@@ -1244,7 +1247,7 @@ where
                 None,
             )
             .await?;
-        parse_vault_response(res)
+        parse_vault_response(res).await
     }
 
     /// Encrypt a plaintext via Transit secret backend.
@@ -1275,7 +1278,7 @@ where
                 None,
             )
             .await?;
-        let decoded: VaultResponse<TransitEncryptedData> = parse_vault_response(res)?;
+        let decoded: VaultResponse<TransitEncryptedData> = parse_vault_response(res).await?;
         let payload = match decoded.data {
             Some(data) => data.ciphertext,
             _ => {
@@ -1324,7 +1327,7 @@ where
                 None,
             )
             .await?;
-        let decoded: VaultResponse<TransitDecryptedData> = parse_vault_response(res)?;
+        let decoded: VaultResponse<TransitDecryptedData> = parse_vault_response(res).await?;
         let decrypted = match decoded.data {
             Some(data) => data.plaintext,
             _ => {
@@ -1356,23 +1359,23 @@ where
         match http_verb {
             HttpVerb::GET => {
                 let res = self.get(&url, wrap_ttl).await?;
-                parse_endpoint_response(res)
+                parse_endpoint_response(res).await
             }
             HttpVerb::POST => {
                 let res = self.post(&url, body, wrap_ttl).await?;
-                parse_endpoint_response(res)
+                parse_endpoint_response(res).await
             }
             HttpVerb::PUT => {
                 let res = self.put(&url, body, wrap_ttl).await?;
-                parse_endpoint_response(res)
+                parse_endpoint_response(res).await
             }
             HttpVerb::DELETE => {
                 let res = self.delete(&url).await?;
-                parse_endpoint_response(res)
+                parse_endpoint_response(res).await
             }
             HttpVerb::LIST => {
                 let res = self.list(&url, body, wrap_ttl).await?;
-                parse_endpoint_response(res)
+                parse_endpoint_response(res).await
             }
         }
     }
@@ -1461,7 +1464,7 @@ where
         let res = self
             .get::<_, String>(&format!("/v1/{}/creds/{}", backend, name)[..], None)
             .await?;
-        let decoded: VaultResponse<K> = parse_vault_response(res)?;
+        let decoded: VaultResponse<K> = parse_vault_response(res).await?;
         Ok(decoded)
     }
 
@@ -1483,7 +1486,7 @@ where
     /// [/sys/policy]: https://www.vaultproject.io/docs/http/sys-policy.html
     pub async fn policies(&self) -> Result<Vec<String>> {
         let res = self.get::<_, String>("/v1/sys/policy", None).await?;
-        let decoded: PoliciesResponse = parse_vault_response(res)?;
+        let decoded: PoliciesResponse = parse_vault_response(res).await?;
         Ok(decoded.policies)
     }
 
@@ -1502,7 +1505,8 @@ where
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
             None => Ok(handle_reqwest_response(
                 self.client
                     .request(Method::GET, h)
@@ -1510,7 +1514,8 @@ where
                     .header(CONTENT_TYPE, "application/json")
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
         }
     }
 
@@ -1522,7 +1527,8 @@ where
                 .header(CONTENT_TYPE, "application/json")
                 .send()
                 .await,
-        )?)
+        )
+        .await?)
     }
 
     async fn post<S1: AsRef<str>, S2: Into<String>>(
@@ -1547,7 +1553,8 @@ where
                     .body(body)
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
             None => Ok(handle_reqwest_response(
                 self.client
                     .request(Method::POST, h)
@@ -1556,7 +1563,8 @@ where
                     .body(body)
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
         }
     }
 
@@ -1582,7 +1590,8 @@ where
                     .body(body)
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
             None => Ok(handle_reqwest_response(
                 self.client
                     .request(Method::PUT, h)
@@ -1591,7 +1600,8 @@ where
                     .body(body)
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
         }
     }
 
@@ -1620,7 +1630,8 @@ where
                     .body(body)
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
             None => Ok(handle_reqwest_response(
                 self.client
                     .request(
@@ -1632,27 +1643,22 @@ where
                     .body(body)
                     .send()
                     .await,
-            )?),
+            )
+            .await?),
         }
     }
 }
 
 /// helper fn to check `Response` for success
-fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
-    let mut res = res?;
+// TODO: read error message again
+async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
+    let res = res?;
     if res.status().is_success() {
         Ok(res)
     } else {
-        let mut error_msg = String::new();
-        let _ = res.read_to_string(&mut error_msg).unwrap_or({
-            error_msg.push_str("Could not read vault response.");
-            0
-        });
+        let res_debug = format!("{:?}", &res);
         Err(Error::VaultResponse(
-            format!(
-                "Vault request failed: {:?}, error message: `{}`",
-                res, error_msg
-            ),
+            format!("Vault request failed: {:?}", res_debug),
             res,
         ))
     }
@@ -1754,20 +1760,20 @@ fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<R
 /// let thing = res2.unwrap();
 /// assert_eq!(thing.awesome, "I really am cool");
 /// assert_eq!(thing.thing, "this is also in the secret");
-pub fn parse_vault_response<T>(res: Response) -> Result<T>
+pub async fn parse_vault_response<T>(res: Response) -> Result<T>
 where
     T: DeserializeOwned,
 {
     trace!("Response: {:?}", &res);
-    Ok(serde_json::from_reader(res)?)
+    Ok(res.json().await?)
 }
 
 /// checks if response is empty before attempting to convert to a `VaultResponse`
-fn parse_endpoint_response<T>(res: Response) -> Result<EndpointResponse<T>>
+async fn parse_endpoint_response<T>(res: Response) -> Result<EndpointResponse<T>>
 where
     T: DeserializeOwned,
 {
-    let body = res.text()?;
+    let body = res.text().await?;
     trace!("Response: {:?}", &body);
     if body.is_empty() {
         Ok(EndpointResponse::Empty)
