@@ -267,15 +267,23 @@ mod tests {
         let role_id = &data["role_id"];
         assert!(!role_id.is_empty());
 
+        // needed because secret_id_ttl is an integer
+        #[derive(Deserialize, Debug)]
+        struct SecretInfo {
+            secret_id_accessor: String,
+            secret_id: String,
+            secret_id_ttl: i32,
+        }
+
         // now get a secret id for this approle
-        let res: EndpointResponse<HashMap<String, String>> = c
+        let res: EndpointResponse<SecretInfo> = c
             .call_endpoint(POST, "auth/approle/role/test_role/secret-id", None, None)
             .unwrap();
         let data = match res {
             EndpointResponse::VaultResponse(res) => res.data.unwrap(),
             _ => panic!("expected vault response, got: {:?}", res),
         };
-        let secret_id = &data["secret_id"];
+        let secret_id = &data.secret_id;
 
         // now finally we can try to actually login!
         let _ = Client::new_app_role(HOST, &role_id[..], Some(&secret_id[..])).unwrap();
