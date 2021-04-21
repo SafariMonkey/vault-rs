@@ -26,9 +26,9 @@ quick_error! {
         }
         /// Response from Vault errors
         /// This is for when the response is not successful.
-        VaultResponse(err: String, response: reqwest::Response) {
+        VaultResponse(body: String, response: reqwest::Response) {
             description("vault response error")
-            display("Error in vault response: {}", err)
+            display("Error in vault response: {:?}: {}", response, body)
         }
         /// IO errors
         Io(err: ::std::io::Error) {
@@ -46,6 +46,13 @@ quick_error! {
         }
         /// `Base64` decode error
         Base64(err: ::base64::DecodeError) {
+            from()
+                description("base64 decode error")
+                display("base64 decode error: {}", err)
+                cause(err)
+        }
+        /// `Utf8` decode error
+        Utf8(err: ::std::string::FromUtf8Error) {
             from()
                 description("base64 decode error")
                 display("base64 decode error: {}", err)

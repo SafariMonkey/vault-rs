@@ -1684,16 +1684,25 @@ where
 }
 
 /// helper fn to check `Response` for success
-// TODO: read error message again
 async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
-    let res = res?;
+    let mut res = res?;
     if res.status().is_success() {
         Ok(res)
     } else {
-        Err(Error::VaultResponse(
-            format!("Vault request failed: {:?}", res),
-            res,
-        ))
+        let body = extract_body(&mut res).await?;
+        let body = String::from_utf8(body)?;
+        Err(Error::VaultResponse(body, res))
+    }
+}
+
+async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> {
+    let mut body = Vec::new();
+    loop {
+        match res.chunk().await {
+            Ok(Some(chunk)) => body.extend_from_slice(&*chunk),
+            Ok(None) => break Ok(body),
+            Err(e) => break Err(e),
+        }
     }
 }
 
@@ -1722,18 +1731,28 @@ async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Re
 ///   thing: String,
 /// }
 ///
-/// // TODO: read error message again
 /// async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
-///     let res = res?;
+///     let mut res = res?;
 ///     if res.status().is_success() {
 ///         Ok(res)
 ///     } else {
-///         Err(Error::VaultResponse(
-///             format!("Vault request failed: {:?}", res),
-///             res,
-///         ))
+///         let body = extract_body(&mut res).await?;
+///         let body = String::from_utf8(body)?;
+///         Err(Error::VaultResponse(body, res))
 ///     }
 /// }
+///
+/// async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> {
+///     let mut body = Vec::new();
+///     loop {
+///         match res.chunk().await {
+///             Ok(Some(chunk)) => body.extend_from_slice(&*chunk),
+///             Ok(None) => break Ok(body),
+///             Err(e) => break Err(e),
+///         }
+///     }
+/// }
+///
 /// async fn get<S1: AsRef<str>, S2: Into<String>, U: TryInto<Url, Err = Error>>(
 ///     host: U,
 ///     token: &str,
