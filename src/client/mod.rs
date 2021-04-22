@@ -664,7 +664,7 @@ impl VaultClient<TokenData> {
         let req = Request::get(uri_from(host.join("/v1/auth/token/lookup-self")?))
             .header("X-Vault-Token", token.clone())
             .body(())
-            .unwrap();
+            .map_err(Error::BuildRequest)?;
         let res = client.send_async(req).await?;
         let decoded: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(VaultClient {
@@ -690,7 +690,7 @@ impl VaultClient<TokenData> {
         let req = Request::get(uri_from(host.join("/v1/auth/token/lookup-self")?))
             .header("X-Vault-Token", token.clone())
             .body(())
-            .unwrap();
+            .map_err(Error::BuildRequest)?;
         let res = client.send_async(req).await?;
         let decoded: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(VaultClient {
@@ -1523,29 +1523,25 @@ where
     ) -> Result<Response<AsyncBody>> {
         let h = uri_from(self.host.join(endpoint.as_ref())?);
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_isahc_response({
+            Some(wrap_ttl) => {
                 let req = Request::builder()
                     .method(Method::GET)
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-                    .body(())
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
-            None => Ok(handle_isahc_response({
+                    .body(());
+                self.send_async(req).await
+            }
+            None => {
                 let req = Request::builder()
                     .method(Method::GET)
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
-                    .body(())
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
+                    .body(());
+                self.send_async(req).await
+            }
         }
     }
 
@@ -1555,9 +1551,8 @@ where
             .uri(uri_from(self.host.join(endpoint.as_ref())?))
             .header("X-Vault-Token", self.token.to_string())
             .header(CONTENT_TYPE, "application/json")
-            .body(())
-            .unwrap();
-        let res = self.client.send_async(req).await?;
+            .body(());
+        let res = self.send_async(req).await?;
         Ok(res)
     }
 
@@ -1574,29 +1569,25 @@ where
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_isahc_response({
+            Some(wrap_ttl) => {
                 let req = Request::builder()
                     .method(Method::POST)
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-                    .body(body)
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
-            None => Ok(handle_isahc_response({
+                    .body(body);
+                self.send_async(req).await
+            }
+            None => {
                 let req = Request::builder()
                     .method(Method::POST)
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
-                    .body(body)
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
+                    .body(body);
+                self.send_async(req).await
+            }
         }
     }
 
@@ -1613,29 +1604,25 @@ where
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_isahc_response({
+            Some(wrap_ttl) => {
                 let req = Request::builder()
                     .method(Method::PUT)
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-                    .body(body)
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
-            None => Ok(handle_isahc_response({
+                    .body(body);
+                self.send_async(req).await
+            }
+            None => {
                 let req = Request::builder()
                     .method(Method::PUT)
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
-                    .body(body)
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
+                    .body(body);
+                self.send_async(req).await
+            }
         }
     }
 
@@ -1652,7 +1639,7 @@ where
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_isahc_response({
+            Some(wrap_ttl) => {
                 let req = Request::builder()
                     .method(
                         Method::from_str("LIST".into()).expect("Failed to parse LIST to Method"),
@@ -1661,12 +1648,10 @@ where
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-                    .body(body)
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
-            None => Ok(handle_isahc_response({
+                    .body(body);
+                self.send_async(req).await
+            }
+            None => {
                 let req = Request::builder()
                     .method(
                         Method::from_str("LIST".into()).expect("Failed to parse LIST to Method"),
@@ -1674,12 +1659,18 @@ where
                     .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
-                    .body(body)
-                    .unwrap();
-                self.client.send_async(req).await
-            })
-            .await?),
+                    .body(body);
+                self.send_async(req).await
+            }
         }
+    }
+    async fn send_async<B: Into<AsyncBody>>(
+        &self,
+        req: StdResult<Request<B>, http::Error>,
+    ) -> Result<Response<AsyncBody>> {
+        let req = req.map_err(Error::BuildRequest)?;
+        let res = self.client.send_async().await;
+        handle_isahc_response(res).await
     }
 }
 

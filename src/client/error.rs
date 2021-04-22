@@ -44,6 +44,12 @@ quick_error! {
             display("url parse error: {}", err)
             cause(err)
         }
+        /// `BuildRequest` parsing error
+        BuildRequest(err: ::http::Error) {
+            description("url parse error")
+            display("url parse error: {}", err)
+            cause(err)
+        }
         /// `Base64` decode error
         Base64(err: ::base64::DecodeError) {
             from()
