@@ -6,7 +6,7 @@ quick_error! {
     #[derive(Debug)]
     pub enum Error {
         /// `isahc::Error` errors
-        Reqwest(err: ::isahc::Error) {
+        Isahc(err: ::isahc::Error) {
             from()
             description("isahc error")
             display("isahc error: {}", err)
