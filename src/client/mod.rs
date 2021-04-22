@@ -1669,7 +1669,7 @@ where
         req: StdResult<Request<B>, http::Error>,
     ) -> Result<Response<AsyncBody>> {
         let req = req.map_err(Error::BuildRequest)?;
-        let res = self.client.send_async().await;
+        let res = self.client.send_async(req).await;
         handle_isahc_response(res).await
     }
 }
