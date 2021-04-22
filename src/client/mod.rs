@@ -1706,15 +1706,14 @@ async fn handle_reqwest_response(
 /// # tokio_test::block_on(async {
 /// # use vault::Client;
 /// use std::io::Read;
+/// use std::str::FromStr;
 /// use vault::{Error, Result, client::{VaultResponse, SecretDataWrapper}, TryInto};
 /// use std::result::Result as StdResult;
-/// use reqwest::{
-///    Client as ReqwestClient,
-///    Response,
-///    header::CONTENT_TYPE,
-///    Method,
-///  };
+/// use http::{header::CONTENT_TYPE, method::Method};
+/// use isahc::prelude::*;
+/// use isahc::{self, error::Error as IsahcError, AsyncBody, HttpClient, Request, Response};
 /// use serde::{Deserialize, Serialize};
+/// use url::Url;
 /// use http::Uri;
 ///
 /// #[derive(Debug, Deserialize, Serialize)]
@@ -1723,53 +1722,56 @@ async fn handle_reqwest_response(
 ///   thing: String,
 /// }
 ///
-/// async fn handle_reqwest_response(res: StdResult<Response, IsahcError>) -> Result<Response> {
+/// async fn handle_reqwest_response(
+///     res: StdResult<Response<AsyncBody>, IsahcError>,
+/// ) -> Result<Response<AsyncBody>> {
 ///     let mut res = res?;
 ///     if res.status().is_success() {
 ///         Ok(res)
 ///     } else {
-///         let body = extract_body(&mut res).await?;
-///         let body = String::from_utf8(body)?;
-///         Err(Error::VaultResponse(body, res))
+///         let body = res.text().await?;
+///         let (parts, _) = res.into_parts();
+///         let res = Response::from_parts(parts, body);
+///         Err(Error::VaultResponse(res))
 ///     }
 /// }
 ///
-/// async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, IsahcError> {
-///     let mut body = Vec::new();
-///     loop {
-///         match res.chunk().await {
-///             Ok(Some(chunk)) => body.extend_from_slice(&*chunk),
-///             Ok(None) => break Ok(body),
-///             Err(e) => break Err(e),
-///         }
-///     }
+/// fn uri_from(url: Url) -> Uri {
+///     Uri::from_str(url.as_str()).expect("url should always parse as uri")
 /// }
+///
 ///
 /// async fn get<S1: AsRef<str>, S2: Into<String>, U: TryInto<Url, Err = Error>>(
 ///     host: U,
 ///     token: &str,
 ///     endpoint: S1,
 ///     wrap_ttl: Option<S2>,
-/// ) -> Result<Response> {
+/// ) -> Result<Response<AsyncBody>> {
 /// let host = host.try_into()?;
-///     let h = uri_from(host.join(endpoint.as_ref())?)?;
-///     let client = ReqwestClient::new();;
+///     let h = uri_from(host.join(endpoint.as_ref())?);
+///     let client = HttpClient::new()?;
 ///     match wrap_ttl {
-///         Some(wrap_ttl) => Ok(handle_reqwest_response(
-///             client
-///                 .request(Method::GET).uri(h)
+///         Some(wrap_ttl) => Ok(handle_reqwest_response({
+///             let req = Request::builder()
+///                 .method(Method::GET)
+///                 .uri(h)
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
 ///                 .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-///                 .send().await,
-///         ).await?),
-///         None => Ok(handle_reqwest_response(
-///             client
-///                 .request(Method::GET).uri(h)
+///                 .body(())
+///                 .unwrap();
+///             client.send_async(req).await
+///         }).await?),
+///         None => Ok(handle_reqwest_response({
+///             let req = Request::builder()
+///                 .method(Method::GET)
+///                 .uri(h)
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
-///                 .send().await,
-///         ).await?),
+///                 .body(())
+///                 .unwrap();
+///             client.send_async(req).await
+///         }).await?),
 ///     }
 /// }
 /// let host = "http://127.0.0.1:8200";
