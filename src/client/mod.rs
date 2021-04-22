@@ -1523,7 +1523,7 @@ where
     ) -> Result<Response<AsyncBody>> {
         let h = uri_from(self.host.join(endpoint.as_ref())?);
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response({
+            Some(wrap_ttl) => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(Method::GET)
                     .uri(h)
@@ -1535,7 +1535,7 @@ where
                 self.client.send_async(req).await
             })
             .await?),
-            None => Ok(handle_reqwest_response({
+            None => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(Method::GET)
                     .uri(h)
@@ -1574,7 +1574,7 @@ where
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response({
+            Some(wrap_ttl) => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(Method::POST)
                     .uri(h)
@@ -1586,7 +1586,7 @@ where
                 self.client.send_async(req).await
             })
             .await?),
-            None => Ok(handle_reqwest_response({
+            None => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(Method::POST)
                     .uri(h)
@@ -1613,7 +1613,7 @@ where
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response({
+            Some(wrap_ttl) => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(Method::PUT)
                     .uri(h)
@@ -1625,7 +1625,7 @@ where
                 self.client.send_async(req).await
             })
             .await?),
-            None => Ok(handle_reqwest_response({
+            None => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(Method::PUT)
                     .uri(h)
@@ -1652,7 +1652,7 @@ where
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response({
+            Some(wrap_ttl) => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(
                         Method::from_str("LIST".into()).expect("Failed to parse LIST to Method"),
@@ -1666,7 +1666,7 @@ where
                 self.client.send_async(req).await
             })
             .await?),
-            None => Ok(handle_reqwest_response({
+            None => Ok(handle_isahc_response({
                 let req = Request::builder()
                     .method(
                         Method::from_str("LIST".into()).expect("Failed to parse LIST to Method"),
@@ -1684,7 +1684,7 @@ where
 }
 
 /// helper fn to check `Response<AsyncBody>` for success
-async fn handle_reqwest_response(
+async fn handle_isahc_response(
     res: StdResult<Response<AsyncBody>, IsahcError>,
 ) -> Result<Response<AsyncBody>> {
     let mut res = res?;
@@ -1722,7 +1722,7 @@ async fn handle_reqwest_response(
 ///   thing: String,
 /// }
 ///
-/// async fn handle_reqwest_response(
+/// async fn handle_isahc_response(
 ///     res: StdResult<Response<AsyncBody>, IsahcError>,
 /// ) -> Result<Response<AsyncBody>> {
 ///     let mut res = res?;
@@ -1751,7 +1751,7 @@ async fn handle_reqwest_response(
 ///     let h = uri_from(host.join(endpoint.as_ref())?);
 ///     let client = HttpClient::new()?;
 ///     match wrap_ttl {
-///         Some(wrap_ttl) => Ok(handle_reqwest_response({
+///         Some(wrap_ttl) => Ok(handle_isahc_response({
 ///             let req = Request::builder()
 ///                 .method(Method::GET)
 ///                 .uri(h)
@@ -1762,7 +1762,7 @@ async fn handle_reqwest_response(
 ///                 .unwrap();
 ///             client.send_async(req).await
 ///         }).await?),
-///         None => Ok(handle_reqwest_response({
+///         None => Ok(handle_isahc_response({
 ///             let req = Request::builder()
 ///                 .method(Method::GET)
 ///                 .uri(h)
