@@ -5,11 +5,11 @@ quick_error! {
     /// Error enum for vault-rs
     #[derive(Debug)]
     pub enum Error {
-        /// `reqwest::Error` errors
-        Reqwest(err: ::reqwest::Error) {
+        /// `isahc::Error` errors
+        Reqwest(err: ::isahc::Error) {
             from()
-            description("reqwest error")
-            display("reqwest error: {}", err)
+            description("isahc error")
+            display("isahc error: {}", err)
             cause(err)
         }
         /// `serde_json::Error`
@@ -26,9 +26,9 @@ quick_error! {
         }
         /// Response from Vault errors
         /// This is for when the response is not successful.
-        VaultResponse(body: String, response: reqwest::Response) {
+        VaultResponse(response: isahc::Response<String>) {
             description("vault response error")
-            display("Error in vault response: {:?}: {}", response, body)
+            display("Error in vault response: {:?}", response)
         }
         /// IO errors
         Io(err: ::std::io::Error) {

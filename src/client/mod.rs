@@ -6,12 +6,15 @@ use std::str::FromStr;
 
 use crate::client::error::{Error, Result};
 use base64;
-use reqwest::{self, header::CONTENT_TYPE, Client, Method, Response};
+use http::{header::CONTENT_TYPE, method::Method};
+use isahc::prelude::*;
+use isahc::{self, error::Error as IsahcError, AsyncBody, HttpClient, Request, Response};
 use serde::de::{self, DeserializeOwned, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::TryInto;
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
+use http::Uri;
 use serde_json;
 use std::time::Duration;
 use url::Url;
@@ -241,7 +244,7 @@ pub struct VaultClient<T> {
     /// Token to access vault
     pub token: String,
     /// `reqwest::Client`
-    client: Client,
+    client: HttpClient,
     /// Data
     pub data: Option<VaultResponse<T>>,
     /// The secret backend name. Defaults to 'secret'
@@ -656,16 +659,13 @@ impl VaultClient<TokenData> {
         U: TryInto<Url, Err = Error>,
     {
         let host = host.try_into()?;
-        let client = Client::new();
+        let client = HttpClient::new()?;
         let token = token.into();
-        let res = handle_reqwest_response(
-            client
-                .get(host.join("/v1/auth/token/lookup-self")?)
-                .header("X-Vault-Token", token.clone())
-                .send()
-                .await,
-        )
-        .await?;
+        let req = Request::get(uri_from(host.join("/v1/auth/token/lookup-self")?))
+            .header("X-Vault-Token", token.clone())
+            .body(())
+            .unwrap();
+        let res = client.send_async(req).await?;
         let decoded: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(VaultClient {
             host,
@@ -679,7 +679,7 @@ impl VaultClient<TokenData> {
     pub async fn new_from_reqwest<U, T: Into<String>>(
         host: U,
         token: T,
-        cli: Client,
+        cli: HttpClient,
     ) -> Result<VaultClient<TokenData>>
     where
         U: TryInto<Url, Err = Error>,
@@ -687,14 +687,11 @@ impl VaultClient<TokenData> {
         let host = host.try_into()?;
         let client = cli;
         let token = token.into();
-        let res = handle_reqwest_response(
-            client
-                .get(host.join("/v1/auth/token/lookup-self")?)
-                .header("X-Vault-Token", token.clone())
-                .send()
-                .await,
-        )
-        .await?;
+        let req = Request::get(uri_from(host.join("/v1/auth/token/lookup-self")?))
+            .header("X-Vault-Token", token.clone())
+            .body(())
+            .unwrap();
+        let res = client.send_async(req).await?;
         let decoded: VaultResponse<TokenData> = parse_vault_response(res).await?;
         Ok(VaultClient {
             host,
@@ -721,19 +718,15 @@ impl VaultClient<()> {
         U: TryInto<Url, Err = Error>,
     {
         let host = host.try_into()?;
-        let client = Client::new();
+        let client = HttpClient::new()?;
         let payload = serde_json::to_string(&AppIdPayload {
             app_id: app_id.into(),
             user_id: user_id.into(),
         })?;
-        let res = handle_reqwest_response(
-            client
-                .post(host.join("/v1/auth/app-id/login")?)
-                .body(payload)
-                .send()
-                .await,
-        )
-        .await?;
+        let req = Request::post(uri_from(host.join("/v1/auth/app-id/login")?))
+            .body(payload)
+            .unwrap();
+        let res = client.send_async(req).await?;
         let decoded: VaultResponse<()> = parse_vault_response(res).await?;
         let token = match decoded.auth {
             Some(ref auth) => auth.client_token.clone(),
@@ -766,7 +759,7 @@ impl VaultClient<()> {
         S: Into<String>,
     {
         let host = host.try_into()?;
-        let client = Client::new();
+        let client = HttpClient::new()?;
         let secret_id = match secret_id {
             Some(s) => Some(s.into()),
             None => None,
@@ -775,14 +768,10 @@ impl VaultClient<()> {
             role_id: role_id.into(),
             secret_id,
         })?;
-        let res = handle_reqwest_response(
-            client
-                .post(host.join("/v1/auth/approle/login")?)
-                .body(payload)
-                .send()
-                .await,
-        )
-        .await?;
+        let req = Request::post(uri_from(host.join("/v1/auth/approle/login")?))
+            .body(payload)
+            .unwrap();
+        let res = client.send_async(req).await?;
         let decoded: VaultResponse<()> = parse_vault_response(res).await?;
         let token = match decoded.auth {
             Some(ref auth) => auth.client_token.clone(),
@@ -811,7 +800,7 @@ impl VaultClient<()> {
     where
         U: TryInto<Url, Err = Error>,
     {
-        let client = Client::new();
+        let client = HttpClient::new()?;
         let host = host.try_into()?;
         Ok(VaultClient {
             host,
@@ -825,7 +814,7 @@ impl VaultClient<()> {
 
 impl<T> VaultClient<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Unpin,
 {
     /// Set the backend name to be used by this VaultClient
     ///
@@ -1210,7 +1199,10 @@ where
     /// assert_eq!(thing.thing, "this is also in the secret");
     /// # })
     /// ```
-    pub async fn get_custom_secret<S: AsRef<str>, S2: DeserializeOwned + std::fmt::Debug>(
+    pub async fn get_custom_secret<
+        S: AsRef<str>,
+        S2: DeserializeOwned + std::fmt::Debug + Unpin,
+    >(
         &self,
         secret_name: S,
     ) -> Result<S2> {
@@ -1491,7 +1483,7 @@ where
         name: &str,
     ) -> Result<VaultResponse<K>>
     where
-        K: DeserializeOwned,
+        K: DeserializeOwned + Unpin,
     {
         let res = self
             .get::<_, String>(&format!("/v1/{}/creds/{}", backend, name)[..], None)
@@ -1528,41 +1520,45 @@ where
         &self,
         endpoint: S1,
         wrap_ttl: Option<S2>,
-    ) -> Result<Response> {
-        let h = self.host.join(endpoint.as_ref())?;
+    ) -> Result<Response<AsyncBody>> {
+        let h = uri_from(self.host.join(endpoint.as_ref())?);
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response(
-                self.client
-                    .request(Method::GET, h)
+            Some(wrap_ttl) => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(Method::GET)
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
-                    .send()
-                    .await,
-            )
+                    .body(())
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
-            None => Ok(handle_reqwest_response(
-                self.client
-                    .request(Method::GET, h)
+            None => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(Method::GET)
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
-                    .send()
-                    .await,
-            )
+                    .body(())
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
         }
     }
 
-    async fn delete<S: AsRef<str>>(&self, endpoint: S) -> Result<Response> {
-        Ok(handle_reqwest_response(
-            self.client
-                .request(Method::DELETE, self.host.join(endpoint.as_ref())?)
-                .header("X-Vault-Token", self.token.to_string())
-                .header(CONTENT_TYPE, "application/json")
-                .send()
-                .await,
-        )
-        .await?)
+    async fn delete<S: AsRef<str>>(&self, endpoint: S) -> Result<Response<AsyncBody>> {
+        let req = Request::builder()
+            .method(Method::DELETE)
+            .uri(uri_from(self.host.join(endpoint.as_ref())?))
+            .header("X-Vault-Token", self.token.to_string())
+            .header(CONTENT_TYPE, "application/json")
+            .body(())
+            .unwrap();
+        let res = self.client.send_async(req).await?;
+        Ok(res)
     }
 
     async fn post<S1: AsRef<str>, S2: Into<String>>(
@@ -1570,34 +1566,36 @@ where
         endpoint: S1,
         body: Option<&str>,
         wrap_ttl: Option<S2>,
-    ) -> Result<Response> {
-        let h = self.host.join(endpoint.as_ref())?;
+    ) -> Result<Response<AsyncBody>> {
+        let h = uri_from(self.host.join(endpoint.as_ref())?);
         let body = if let Some(body) = body {
             body.to_string()
         } else {
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response(
-                self.client
-                    .request(Method::POST, h)
+            Some(wrap_ttl) => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(Method::POST)
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .body(body)
-                    .send()
-                    .await,
-            )
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
-            None => Ok(handle_reqwest_response(
-                self.client
-                    .request(Method::POST, h)
+            None => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(Method::POST)
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send()
-                    .await,
-            )
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
         }
     }
@@ -1607,34 +1605,36 @@ where
         endpoint: S1,
         body: Option<&str>,
         wrap_ttl: Option<S2>,
-    ) -> Result<Response> {
-        let h = self.host.join(endpoint.as_ref())?;
+    ) -> Result<Response<AsyncBody>> {
+        let h = uri_from(self.host.join(endpoint.as_ref())?);
         let body = if let Some(body) = body {
             body.to_string()
         } else {
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response(
-                self.client
-                    .request(Method::PUT, h)
+            Some(wrap_ttl) => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(Method::PUT)
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .body(body)
-                    .send()
-                    .await,
-            )
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
-            None => Ok(handle_reqwest_response(
-                self.client
-                    .request(Method::PUT, h)
+            None => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(Method::PUT)
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send()
-                    .await,
-            )
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
         }
     }
@@ -1644,65 +1644,57 @@ where
         endpoint: S1,
         body: Option<&str>,
         wrap_ttl: Option<S2>,
-    ) -> Result<Response> {
-        let h = self.host.join(endpoint.as_ref())?;
+    ) -> Result<Response<AsyncBody>> {
+        let h = uri_from(self.host.join(endpoint.as_ref())?);
         let body = if let Some(body) = body {
             body.to_string()
         } else {
             String::new()
         };
         match wrap_ttl {
-            Some(wrap_ttl) => Ok(handle_reqwest_response(
-                self.client
-                    .request(
+            Some(wrap_ttl) => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(
                         Method::from_str("LIST".into()).expect("Failed to parse LIST to Method"),
-                        h,
                     )
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .header("X-Vault-Wrap-TTL", wrap_ttl.into())
                     .body(body)
-                    .send()
-                    .await,
-            )
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
-            None => Ok(handle_reqwest_response(
-                self.client
-                    .request(
+            None => Ok(handle_reqwest_response({
+                let req = Request::builder()
+                    .method(
                         Method::from_str("LIST".into()).expect("Failed to parse LIST to Method"),
-                        h,
                     )
+                    .uri(h)
                     .header("X-Vault-Token", self.token.to_string())
                     .header(CONTENT_TYPE, "application/json")
                     .body(body)
-                    .send()
-                    .await,
-            )
+                    .unwrap();
+                self.client.send_async(req).await
+            })
             .await?),
         }
     }
 }
 
-/// helper fn to check `Response` for success
-async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
+/// helper fn to check `Response<AsyncBody>` for success
+async fn handle_reqwest_response(
+    res: StdResult<Response<AsyncBody>, IsahcError>,
+) -> Result<Response<AsyncBody>> {
     let mut res = res?;
     if res.status().is_success() {
         Ok(res)
     } else {
-        let body = extract_body(&mut res).await?;
-        let body = String::from_utf8(body)?;
-        Err(Error::VaultResponse(body, res))
-    }
-}
-
-async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> {
-    let mut body = Vec::new();
-    loop {
-        match res.chunk().await {
-            Ok(Some(chunk)) => body.extend_from_slice(&*chunk),
-            Ok(None) => break Ok(body),
-            Err(e) => break Err(e),
-        }
+        let body = res.text().await?;
+        let (parts, _) = res.into_parts();
+        let res = Response::from_parts(parts, body);
+        Err(Error::VaultResponse(res))
     }
 }
 
@@ -1723,7 +1715,7 @@ async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> 
 ///    Method,
 ///  };
 /// use serde::{Deserialize, Serialize};
-/// use url::Url;
+/// use http::Uri;
 ///
 /// #[derive(Debug, Deserialize, Serialize)]
 /// struct MyThing {
@@ -1731,7 +1723,7 @@ async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> 
 ///   thing: String,
 /// }
 ///
-/// async fn handle_reqwest_response(res: StdResult<Response, reqwest::Error>) -> Result<Response> {
+/// async fn handle_reqwest_response(res: StdResult<Response, IsahcError>) -> Result<Response> {
 ///     let mut res = res?;
 ///     if res.status().is_success() {
 ///         Ok(res)
@@ -1742,7 +1734,7 @@ async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> 
 ///     }
 /// }
 ///
-/// async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> {
+/// async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, IsahcError> {
 ///     let mut body = Vec::new();
 ///     loop {
 ///         match res.chunk().await {
@@ -1760,12 +1752,12 @@ async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> 
 ///     wrap_ttl: Option<S2>,
 /// ) -> Result<Response> {
 /// let host = host.try_into()?;
-///     let h = host.join(endpoint.as_ref())?;
+///     let h = uri_from(host.join(endpoint.as_ref())?)?;
 ///     let client = ReqwestClient::new();;
 ///     match wrap_ttl {
 ///         Some(wrap_ttl) => Ok(handle_reqwest_response(
 ///             client
-///                 .request(Method::GET, h)
+///                 .request(Method::GET).uri(h)
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
 ///                 .header("X-Vault-Wrap-TTL", wrap_ttl.into())
@@ -1773,7 +1765,7 @@ async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> 
 ///         ).await?),
 ///         None => Ok(handle_reqwest_response(
 ///             client
-///                 .request(Method::GET, h)
+///                 .request(Method::GET).uri(h)
 ///                 .header("X-Vault-Token", token.to_string())
 ///                 .header(CONTENT_TYPE, "application/json")
 ///                 .send().await,
@@ -1809,16 +1801,16 @@ async fn extract_body(res: &mut Response) -> StdResult<Vec<u8>, reqwest::Error> 
 /// assert_eq!(thing.thing, "this is also in the secret");
 /// # })
 /// ```
-pub async fn parse_vault_response<T>(res: Response) -> Result<T>
+pub async fn parse_vault_response<T>(mut res: Response<AsyncBody>) -> Result<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Unpin,
 {
     trace!("Response: {:?}", &res);
     Ok(res.json().await?)
 }
 
 /// checks if response is empty before attempting to convert to a `VaultResponse`
-async fn parse_endpoint_response<T>(res: Response) -> Result<EndpointResponse<T>>
+async fn parse_endpoint_response<T>(mut res: Response<AsyncBody>) -> Result<EndpointResponse<T>>
 where
     T: DeserializeOwned,
 {
@@ -1831,4 +1823,9 @@ where
             &body,
         )?))
     }
+}
+
+// https://github.com/hyperium/http/pull/205
+fn uri_from(url: Url) -> Uri {
+    Uri::from_str(url.as_str()).expect("url should always parse as uri")
 }

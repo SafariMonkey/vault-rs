@@ -18,7 +18,6 @@
 //! Client API for interacting with [Vault](https://www.vaultproject.io/docs/http/index.html)
 
 extern crate base64;
-extern crate reqwest;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -122,7 +121,7 @@ mod tests {
     use crate::client::VaultClient as Client;
     use crate::client::{self, EndpointResponse};
     use crate::Error;
-    use reqwest::StatusCode;
+    use http::StatusCode;
     use serde::{Deserialize, Serialize};
 
     /// vault host for testing
@@ -189,7 +188,7 @@ mod tests {
         let res = client.list_secrets("non/existent/key").await;
         assert!(res.is_err());
 
-        if let Err(Error::VaultResponse(_, response)) = res {
+        if let Err(Error::VaultResponse(response)) = res {
             assert_eq!(response.status(), StatusCode::NOT_FOUND);
         } else {
             panic!("Error should match on VaultResponse with reqwest response.");
